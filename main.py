@@ -1,6 +1,7 @@
 import xlrd
 import xlsxwriter
 import matplotlib.pyplot as plt
+import Apriori as ap
 
 
 # read data set
@@ -26,10 +27,11 @@ def find_transactions(loc=None, index_sheet=0 ,  sheet=None , save_loc="new_file
     # InvoiceNo_Item Dic
     InvoiceNo_Item = {}
     for row in range(1, sheet.nrows):
-        if sheet.cell_value(row, 0) not in InvoiceNo_Item:
-            InvoiceNo_Item[sheet.cell_value(row, 0)] = [sheet.cell_value(row, 2)]
-        else:
-            InvoiceNo_Item[sheet.cell_value(row, 0)].append(sheet.cell_value(row, 2))
+        if sheet.cell_value(row, 2) != '':
+            if (sheet.cell_value(row, 0) not in InvoiceNo_Item):
+                InvoiceNo_Item[sheet.cell_value(row, 0)] = [sheet.cell_value(row, 2)]
+            else:
+                InvoiceNo_Item[sheet.cell_value(row, 0)].append(sheet.cell_value(row, 2))
 
     # Create xlsx
     workbook = xlsxwriter.Workbook(save_loc)
@@ -46,6 +48,7 @@ def find_transactions(loc=None, index_sheet=0 ,  sheet=None , save_loc="new_file
         col = 0
         row += 1
     workbook.close()
+    return InvoiceNo_Item
 
 
 def find_items_count(loc=None , index_sheet=0 ,  sheet=None , save_fig="Item_Frequency" , number_of_best_item=1):
@@ -120,6 +123,7 @@ if __name__ == '__main__':
     loc = ("test.xlsx")
     wb = xlrd.open_workbook(loc)
     sheet = wb.sheet_by_index(0)
-    find_transactions(sheet=sheet, save_loc="VoiceNo_Item.xlsx" , save_sheet="transactions")
-    find_items_count(sheet=sheet , number_of_best_item=10)
+    Invoice_Item = find_transactions(sheet=sheet, save_loc="VoiceNo_Item.xlsx" , save_sheet="transactions")
+#    find_items_count(sheet=sheet , number_of_best_item=10)
+    ap.apriori(Invoice_Item.values(), 0.6, 0.03)
     print("finish")
