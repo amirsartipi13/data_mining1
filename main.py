@@ -2,10 +2,12 @@ import xlrd
 import xlsxwriter
 import matplotlib.pyplot as plt
 import Apriori as ap
+import ExcelManager
 
 
 # read data set
-def find_transactions(loc=None, index_sheet=0 ,  sheet=None , save_loc="new_file.xlsx" , save_sheet="new_sheet"):
+def find_transactions(loc=None, index_sheet=0, sheet=None, save_excel_name="new_file", save_sheet="new_sheet",
+                      out_folder=""):
     """question 1
     this function find transactions from a sheet and save to a new xlsx file
     inputs:
@@ -34,7 +36,7 @@ def find_transactions(loc=None, index_sheet=0 ,  sheet=None , save_loc="new_file
                 InvoiceNo_Item[sheet.cell_value(row, 0)].append(sheet.cell_value(row, 2))
 
     # Create xlsx
-    workbook = xlsxwriter.Workbook(save_loc)
+    workbook = xlsxwriter.Workbook(out_folder + save_excel_name + ".xlsx")
     worksheet = workbook.add_worksheet(save_sheet)
 
     # Write InvoiceNo And Item Into xlsx .
@@ -51,7 +53,8 @@ def find_transactions(loc=None, index_sheet=0 ,  sheet=None , save_loc="new_file
     return InvoiceNo_Item
 
 
-def find_items_count(loc=None , index_sheet=0 ,  sheet=None , save_fig="Item_Frequency" , number_of_best_item=1):
+def find_items_count(loc=None, index_sheet=0, sheet=None, save_fig="Item_Frequency", number_of_best_item=1,
+                     save_excel_name="Item_Frequency", out_folder=""):
     """question2
     this function find count of each items and print them  and save plot of it
     inputs:
@@ -80,50 +83,65 @@ def find_items_count(loc=None , index_sheet=0 ,  sheet=None , save_fig="Item_Fre
         else:
             Item_Number[sheet.cell_value(row, 2)] += sheet.cell_value(row, 3)
 
-
-    print("total item is : " , Total_Item)
+    print("total item is : ", Total_Item)
 
     Item_Names = list(Item_Number.keys())
     Item_Frequencies = []
     Item_Number_list = []
 
     for item in Item_Number:
-        Item_Number_list.append((item ,Item_Number.get(item) ))
+        Item_Number_list.append((item, Item_Number.get(item)))
         Item_Frequencies.append(Item_Number.get(item) / Total_Item)
 
     best_Item_Names = []
     best_Item_Frequencies = []
-    Item_Number_list.sort(key=lambda item:item[1] ,reverse=True) # sort and find best items
+    Item_Number_list.sort(key=lambda item: item[1], reverse=True)  # sort and find best items
 
-    #print Items
-    for index , item in enumerate(Item_Number_list):
-        print(item[0],"   " , item[1] ,"   ", item[1] / Total_Item)
+    # print Items
+    information = []
+    for index, item in enumerate(Item_Number_list):
+        # print(item[0],"   " , item[1] ,"   ", item[1] / Total_Item)
+        information.append([item[0], item[1], item[1] / Total_Item])
+
         if index < number_of_best_item:
             best_Item_Names.append(item[0])
-            best_Item_Frequencies.append(item[1]/Total_Item)
+            best_Item_Frequencies.append(item[1] / Total_Item)
+
+    # save frequency excel
+    ExcelManager.delet_excel(excel_name=save_excel_name,base_address=out_folder)
+    ExcelManager.create_sheet(excel_name=save_excel_name , sheet_name=save_excel_name,
+                              columns_name=["item", "count", "Item_Frequency"],base_address=out_folder)
+    ExcelManager.add_rows(excel_name=save_fig, sheet_name=save_fig, datas=information , base_address=out_folder)
 
     # save figure of items
-    fig, axs = plt.subplots(figsize=(250 , 50))
-    plt.xticks(rotation=60 , fontsize=20)
-
+    print("____________________")
+    for a in Item_Names:
+        print(a)
+    print("_____________________")
+    fig, axs = plt.subplots(figsize=(250, 50))
+    plt.xticks(rotation=60, fontsize=20)
+    plt.yticks(fontsize=20)
     axs.bar(Item_Names, Item_Frequencies)
     fig.suptitle('Item_Frequency', fontsize=30)
     plt.savefig(save_fig)
 
     # save figure of best items
 
-    fig, axs = plt.subplots(figsize=(100, 50) )
-    plt.xticks(rotation=60 ,fontsize=20)
+    fig, axs = plt.subplots(figsize=(100, 50))
+    plt.xticks(rotation=60, fontsize=20)
+    plt.yticks(fontsize=20)
     axs.bar(best_Item_Names, best_Item_Frequencies)
-    fig.suptitle('best Item_Frequency' , fontsize=30)
-    plt.savefig("best "+save_fig)
+    fig.suptitle('best Item_Frequency', fontsize=30)
+    plt.savefig("best " + save_fig)
 
 
 if __name__ == '__main__':
-    loc = ("test.xlsx")
+    loc = "Online_Shopping.xlsx"
+    outs_folder = "outs\\"
     wb = xlrd.open_workbook(loc)
     sheet = wb.sheet_by_index(0)
-    Invoice_Item = find_transactions(sheet=sheet, save_loc="VoiceNo_Item.xlsx" , save_sheet="transactions")
-#    find_items_count(sheet=sheet , number_of_best_item=10)
+    Invoice_Item = find_transactions(sheet=sheet, save_excel_name="VoiceNo_Item", save_sheet="transactions",
+                                     out_folder=outs_folder)
+    find_items_count(sheet=sheet, number_of_best_item=10, save_excel_name="ferequency", out_folder=outs_folder)
     ap.apriori(Invoice_Item.values(), 0.6, 0.03)
     print("finish")

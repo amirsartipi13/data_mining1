@@ -116,6 +116,7 @@ def apriori(transaction,minconf,minsup):
     '''
     The runner function
     '''
+    print("_________________________________")
     L, data = L1(transaction, minsup)
     flag = 1
     FreqItems = dict(L)

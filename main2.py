@@ -1,0 +1,121 @@
+import xlrd
+import xlsxwriter
+import matplotlib.pyplot as plt
+import Apriori as ap
+import ExcelManager
+from SqlManager import SqlManager
+import time
+
+# read data set
+def find_transactions(sql_file, save_excel_name="new_file", save_sheet="new_sheet",
+                      out_folder=""):
+    """question 1
+    this function find transactions from a sheet and save to a new xlsx file
+    inputs:
+        loc:location of xlsx file
+        index_sheet:sheet number of input xlsx file
+        sheet:sheet of informations (at least one of the loc or sheet parameters to be sent)
+        save_loc:location of output file
+        save_sheet:name of output sheet
+    outputs:
+        it doasn't have any return value but save a xlsx file of transactions
+    """
+
+    InvoiceNo_Item = {}
+
+    sql_manager = SqlManager(sql_file)
+    invoice_nos = sql_manager.crs.execute("select DISTINCT  InvoiceNo from transactions ")
+    for invoice_no in invoice_nos.fetchall():
+        invoice_no_str = str(invoice_no[0])
+        sql_result = sql_manager.crs.execute(
+            "select Description from transactions where InvoiceNo = " + invoice_no_str).fetchall()
+        sql_result_list = [x[0] for x in sql_result]
+        InvoiceNo_Item[invoice_no_str] = sql_result_list
+
+    # Create xlsx
+    workbook = xlsxwriter.Workbook(out_folder + save_excel_name + ".xlsx")
+    worksheet = workbook.add_worksheet(save_sheet)
+
+    # Write InvoiceNo And Item Into xlsx .
+    row = 0
+    col = 0
+    for InvoiceNo in InvoiceNo_Item:
+        worksheet.write(row, col, InvoiceNo)
+        for item in InvoiceNo_Item[InvoiceNo]:
+            col += 1
+            worksheet.write(row, col, item)
+        col = 0
+        row += 1
+    workbook.close()
+    return InvoiceNo_Item
+
+
+def find_items_count(sql_file, save_fig="Item_Frequency", number_of_best_item=1,
+                     save_excel_name="Item_Frequency", out_folder=""):
+    """question2
+    this function find count of each items and print them  and save plot of it
+    inputs:
+        loc:location of xlsx file
+        index_sheet:sheet number of input xlsx file
+        sheet:sheet of informations (at least one of the loc or sheet parameters to be sent)
+    outputs:
+        it doasn't have any return value but print items' count and best seller items and save items plot and best
+         seller items plot
+    """
+
+    item_names = []
+    information = []
+    item_frequencies = []
+    best_item_names = []
+    best_item_frequencies = []
+
+    sql_manager = SqlManager(sql_file)
+    sql_result = sql_manager.crs.execute(
+        "select  Description,sum(Quantity) from transactions group by Description ORDER BY sum(Quantity) DESC;").fetchall()
+
+    total_item = len(sql_result)
+    for index, item in enumerate(sql_result):
+        information.append([item[0], item[1], item[1] / total_item])
+        item_names.append(item[0])
+        item_frequencies.append(item[1] / total_item)
+        if index < number_of_best_item:
+            best_item_names.append(item[0])
+            best_item_frequencies.append(item[1] / total_item)
+
+    print("total item is : ", total_item)
+
+    # save frequency excel
+    ExcelManager.delet_excel(excel_name=save_excel_name, base_address=out_folder)
+    ExcelManager.create_sheet(excel_name=save_excel_name, sheet_name=save_excel_name,
+                              columns_name=["item", "count", "Item_Frequency"], base_address=out_folder)
+    ExcelManager.add_rows(excel_name=save_excel_name, sheet_name=save_excel_name, datas=information, base_address=out_folder)
+
+    # save figure of items
+
+    fig, axs = plt.subplots(figsize=(250, 50))
+    plt.xticks(rotation=60, fontsize=20)
+    plt.yticks(fontsize=20)
+    axs.bar(item_names, item_frequencies)
+    fig.suptitle('Item_Frequency', fontsize=30)
+    plt.savefig(out_folder+save_fig)
+
+    # save figure of best items
+
+    fig, axs = plt.subplots(figsize=(100, 50))
+    plt.xticks(rotation=60, fontsize=20)
+    plt.yticks(fontsize=20)
+    axs.bar(best_item_names, best_item_frequencies)
+    fig.suptitle('best Item_Frequency', fontsize=30)
+    plt.savefig("best " +out_folder+ save_fig)
+
+
+if __name__ == '__main__':
+    loc = "Online_Shopping.xlsx"
+    outs_folder = "outs\\"
+    time1=time.time()
+    Invoice_Item = find_transactions(sql_file="information.sqlit")
+    find_items_count(sql_file="information.sqlit", number_of_best_item=10, save_excel_name="ferequency",
+                     out_folder=outs_folder)
+    ap.apriori(Invoice_Item.values(), 0.6, 0.03)
+    print("TIME",time.time()-time1)
+    print("finish")
