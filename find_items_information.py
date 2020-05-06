@@ -1,7 +1,7 @@
 import xlrd
 import xlsxwriter
 import matplotlib.pyplot as plt
-import Apriori as ap
+import Apriori3 as ap
 import ExcelManager
 from SqlManager import SqlManager
 import time
@@ -41,16 +41,26 @@ def find_transactions(sql_file, save_excel_name="new_file", save_sheet="new_shee
     workbook = xlsxwriter.Workbook(out_folder + save_excel_name + ".xlsx")
     worksheet = workbook.add_worksheet(save_sheet)
 
+
     # Write InvoiceNo And Item Into xlsx .
     row = 0
     col = 0
     for InvoiceNo in InvoiceNo_Item:
+        sql="INSERT INTO transactions2 values ( "+str(InvoiceNo)+ ', "'
         worksheet.write(row, col, InvoiceNo)
+        items_string=""
         for item in InvoiceNo_Item[InvoiceNo]:
+            item=str(item).replace('"',"'")
+            items_string+="**"+str(item)
             col += 1
             worksheet.write(row, col, item)
+        items_string+='" )'
+        sql += items_string
+        sql_manager.crs.execute(sql)
         col = 0
         row += 1
+    sql_manager.conn.commit()
+
     workbook.close()
     return InvoiceNo_Item
 
@@ -128,6 +138,5 @@ if __name__ == '__main__':
     find_items_count(sql_file="information.sqlit", number_of_best_item=10, save_excel_name="ferequency",
                      out_folder=outs_folder)
 
-    # ap.apriori(Invoice_Item.values(), 0.6, 0.03)
     print("TIME", time.time() - time1)
     print("finish")

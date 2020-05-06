@@ -1,7 +1,6 @@
 import xlrd
 import sqlite3
-import ExcelManager
-
+import time
 
 class SqlManager:
     def __init__(self , file):
@@ -19,6 +18,12 @@ class SqlManager:
                           "CustomerID INT ,"
                           "Country VARCHAR(100) "
                           ")"))
+        self.conn.commit()
+        self.crs.execute("CREATE TABLE IF NOT EXISTS transactions2("
+                         "InvoiceNo VARCHAR(100) NOT NULL ,"
+                         "Descriptions VARCHAR(1000) NOT NULL"
+                         ")")
+        self.conn.commit()
 
     def add_row(self, info):
         query = "INSERT INTO transactions values ("
@@ -28,7 +33,12 @@ class SqlManager:
                     raise Exception("empty ")
                 if str(data).strip().lower()=="manual":
                     raise Exception("MANUAL")
-                data = str(data)
+                if str(data).strip().lower()=="discount":
+                    raise Exception("DISCOUNT")
+                if str(data).strip().lower()=="damaged":
+                    raise Exception("DAMAGED")
+                data = str(data).replace('"',"'")
+
                 if index == 3 or index == 5 or index == 6:
                     if float(data) < 0:
                         raise Exception("negetive number ")
@@ -107,7 +117,8 @@ class SqlManager:
 
 
 if __name__ == '__main__':
-    sql_manager = SqlManager()
+    start_time=time.time()
+    sql_manager = SqlManager("information.sqlit")
     sql_manager.create_database()
     sql_manager.excel_to_sql(excel_name="Online_Shopping", sheet_name="Online Retail")
-    # sql_manager.add_row(["536520","21588","RETROSPOT GIANT TUBE MATCHES","3", "01/12/2010 12:43","2/55","14729","United Kingdom"])
+    print("TIME=",time.time()-start_time)

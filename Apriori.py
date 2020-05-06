@@ -1,130 +1,102 @@
-import itertools
+from SqlManager import SqlManager
+import time
+import ExcelManager
 
-def L1(data,minsup):
-    '''
-    Find frequent 1-itemsets
-    '''
-    print(data," ")
-    for e in data:
-        e = sorted(e)
-    count = {}
-    for items in data:
-        for item in items:
-            if item not in count:
-                count[(item)] = 1
-            else:
-                count[(item)] = count[(item)] + 1
-    #print("C1 Items", count)
-    print("C1 Length : ", len(count))
-    print()
-    #Thresholding
-    count2 = {k: v for k, v in count.items() if v >= minsup*len(data)}
-    #print("L1 Items : ", count2)
-    print("L1 Length : ", len(count2))
-    print()
-    return count2, data
 
-def generateCk(Lk_1, flag, data, minsup):
-    '''
-    Generate Ck by joining 2 Lk-1
-    '''
-    Ck = []
-    if flag == 1:
-        flag = 0
-        for item1 in Lk_1:
-            for item2 in Lk_1:
-                if item2 > item1:
-                    Ck.append((item1, item2))
-        print("C2: ", Ck[1:3])
-        print("length : ", len(Ck))
-        print()
-    else:
-        for item in Lk_1:
-            k = len(item)
-        for item1 in Lk_1:
-            for item2 in Lk_1:
-                if (item1[:-1] == item2[:-1]) and (item1[-1] != item2[-1]):
-                    if item1[-1] > item2[-1]:
-                        Ck.append(item2 + (item1[-1],))
+class Apriori:
+    def __init__(self, sql_file, minconf, minsup):
+        self.sql_manager = SqlManager(sql_file)
+        self.sql_file = sql_file
+        self.minconf = minconf
+        self.minsup = minsup
+
+        invoice_nos = self.sql_manager.crs.execute("select DISTINCT  InvoiceNo from transactions ")
+        self.total_item = len(list(invoice_nos))
+        print("TOTAL ", self.total_item)
+        self.minsup_count = self.minsup * self.total_item
+        self.minconf_count = self.minsup * self.total_item
+
+    def apriori(self):
+
+        sql_result = self.sql_manager.crs.execute(
+            "select  Description,count(Description) from transactions group by Description having count(Description) > "+ str(
+                self.minsup_count)).fetchall()
+
+        L = [[], []]
+        start_time = time.time()
+        L[1] = [[x[0]] for x in sql_result]
+        print("finding L for k=", 1)
+        k = 2
+        while len(L[k - 1]) != 0:
+            print("finish and TIME=", time.time() - start_time)
+            print("finding L for k=", k)
+            start_time = time.time()
+            L.append([])
+            CK = self.apriori_gen(L, k)
+            for ind, C in enumerate(CK):
+                sql = 'select count(Descriptions) from transactions2 where '
+                for item in C:
+                    sql += 'Descriptions like ' + '"%' + str(item).replace('"',"'") + '%" and '
+
+                sql = sql[:-4]
+                size = self.sql_manager.crs.execute(sql).fetchall()[0][0]
+                if size > self.minsup_count:
+                    L[k].append(C)
+
+            k += 1
+
+        return L
+
+    def apriori_gen(self, l, k):
+        CK = []
+        L = l
+        for index1 in range(len(l[k - 1])):
+            l1 = l[k - 1][index1]
+            for index2 in range(index1 + 1, len(l[k - 1])):
+                l2 = l[k - 1][index2]
+                flage = True
+                for i in range(k - 2):
+                    flage = flage and (l1[i] == l2[i])
+                if flage:
+                    try:
+                        c = l1[:k - 2]
+                    except:
+                        c = []
+                    c.append(l1[k - 2])
+                    c.append(l2[k - 2])
+                    if self.has_infrequent_subset(c, l, k):
+                        continue
                     else:
-                        Ck.append(item1 + (item2[-1],))
-        print("C" + str(k+1) + ": ", Ck[1:3])
-        print("Length : ", len(Ck))
-        print()
-    L = generateLk(set(Ck), data, minsup)
-    return L, flag
+                        CK.append(c)
+        return CK
 
-def generateLk(Ck, data,minsup):
-    '''
-    If item in Ck belongs to a transaction,
-    it makes it into list Ct
-    Then Ct is thresholded to form L
-    '''
-    count = {}
-    for itemset in Ck:
-        #print(itemset)
-        for transaction in data:
-            if all(e in transaction for e in itemset):
-                if itemset not in count:
-                    count[itemset] = 1
-                else:
-                    count[itemset] = count[itemset] + 1
+    def has_infrequent_subset(self, c, l, k):
+        if k < 3:
+            return False
 
-    print("Ct Length : ", len(count))
-    print()
+        if [c[-2], c[-1]] in l[2]:
+            return False
+        else:
+            return True
 
-    count2 = {k: v for k, v in count.items() if v >= minsup*len(data)}
-    print("L Length : ", len(count2))
-    print()
-    return count2
 
-def rulegenerator(fitems,minconf):
-    '''
-    Generates association rules from the frequent itemsets
-    '''
-    counter = 0
-    for itemset in fitems.keys():
-        if isinstance(itemset, str):
-            continue
-        length = len(itemset)
-        union_support = fitems[tuple(itemset)]
-        for i in range(1, length):
+if __name__ == '__main__':
+    minsup=0.02
+    ExcelManager.create_sheet(excel_name="apriori",sheet_name=str(minsup),columns_name=[],base_address="outs\\")
+    start_time=time.time()
+    apriory = Apriori("information.sqlit", 0.8, minsup)
+    large_items = apriory.apriori()
+    ExcelManager.add_rows(excel_name="apriori",sheet_name=str(minsup),base_address="outs\\",datas=[["minsup",str(minsup)],["time",str(time.time()-start_time)]])
 
-            lefts = map(list, itertools.combinations(itemset, i))
-            for left in lefts:
-                if len(left) == 1:
-                    if ''.join(left) in fitems:
-                        leftcount = fitems[''.join(left)]
-                        conf = union_support / leftcount
-                else:
-                    if tuple(left) in fitems:
-                        leftcount = fitems[tuple(left)]
-                        conf = union_support / leftcount
-                if conf >= minconf:
-                    fo = open("Rules"+str(minconf)+".txt", "a+")
-                    right = list(itemset[:])
-                    for e in left:
-                        right.remove(e)
-                    fo.write(str(left) + ' (' + str(leftcount) + ')' + ' -> ' + str(right) + ' (' + str(fitems[''.join(right)]) + ')' + ' [' + str(conf) + ']' + '\n')
-                    print(str(left) + ' -> ' + str(right) + ' (' + str(conf) + ')')
-                    counter = counter + 1
-                    #Greater than 1???
-                    fo.close()
-    print(counter, "rules generated")
+    # with open("outs\\apriory.txt","a+") as f :
+    #     f.write("____________________\n")
+    #     f.write("minsup="+str(minsup)+"    time= "+str(time.time()-start_time)+"\n")
+    print(large_items)
+    for k,LK in enumerate(large_items):
+        if len(LK)!=0:
+                ExcelManager.add_rows(excel_name="apriori", sheet_name=str(minsup), base_address="outs\\",datas=LK)
 
-def apriori(transaction,minconf,minsup):
-    '''
-    The runner function
-    '''
-    print("_________________________________")
-    L, data = L1(transaction, minsup)
-    flag = 1
-    FreqItems = dict(L)
-    while(len(L) != 0):
-        fo = open("FreqItems"+str(minsup)+".txt", "a+")
-        for k, v in L.items():
-            fo.write(str(k) + ' >>> ' + str(v) + '\n\n')
-        fo.close()
-        L, flag = generateCk(L, flag, data, minsup)
-        FreqItems.update(L)
-    rulegenerator(FreqItems,minconf)
+#             f.write("L"+str(k)+"= ")
+    #             f.writelines(str(item))
+    #     f.write("\n______________________")
+    print("finish minsup =",minsup)
