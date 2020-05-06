@@ -105,6 +105,7 @@ class SqlManager:
         self.conn.commit()
 
 
+
 if __name__ == '__main__':
     sql_manager = SqlManager()
     sql_manager.create_database()
